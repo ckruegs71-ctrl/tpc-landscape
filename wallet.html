@@ -138,7 +138,7 @@ tfoot td{font-weight:700;border-top:1px solid var(--line);border-bottom:0}
     <div>
       <div class="eyebrow">Where it stands</div>
       <p class="big" id="headline"></p>
-      <p class="small">Every one percent of take rate is <b id="perPoint" class="num"></b> customers. Prices are the only thing missing from this page. Type them in and every dollar figure fills itself.</p>
+      <p class="small">Prices are the only thing missing from this page. Type them in and every dollar figure fills itself.</p>
     </div>
     <div class="base">
       <label for="base">Top Choice customers<input id="base" type="number" min="100" step="1" value="1300"></label>
@@ -158,26 +158,21 @@ tfoot td{font-weight:700;border-top:1px solid var(--line);border-bottom:0}
 
   <section class="card">
     <div class="sec-head">
-      <div><h2>What if more of them said yes</h2><p>Pick a lift and the table shows how many more customers that is for each service, and what it adds once a price is in. Nothing here is a forecast. It is arithmetic on Clay's counts.</p></div>
+      <div><h2>What if more of them said yes</h2><p>Type the percent you want to grow each service by. The table shows how many more customers that is and what it adds once a price is in. Nothing here is a forecast. It is arithmetic on Clay's counts.</p></div>
     </div>
     <div class="controls">
-      <div class="field">Lift
-        <div class="seg" id="lift" role="group" aria-label="Lift">
-          <button type="button" data-v="5">+5</button>
-          <button type="button" data-v="10" aria-pressed="true">+10</button>
-          <button type="button" data-v="25">+25</button>
+      <label class="field" for="custom">Increase every service by<span style="display:flex;align-items:center;gap:6px"><input id="custom" type="number" min="0" max="500" step="1" value="10"><b>%</b></span></label>
+      <div class="field">Quick picks
+        <div class="seg" id="lift" role="group" aria-label="Quick picks">
+          <button type="button" data-v="10" aria-pressed="true">10%</button>
+          <button type="button" data-v="25">25%</button>
+          <button type="button" data-v="50">50%</button>
+          <button type="button" data-v="100">Double</button>
         </div>
       </div>
-      <div class="field">Measured as
-        <div class="seg" id="mode" role="group" aria-label="How the lift is measured">
-          <button type="button" data-v="points" aria-pressed="true">Points of take rate</button>
-          <button type="button" data-v="pct">Percent more buyers</button>
-        </div>
-      </div>
-      <label class="field" for="custom">Or type a lift<input id="custom" type="number" min="0" max="100" step="1" placeholder="e.g. 15"></label>
     </div>
     <div class="scroll"><table id="whatif"></table></div>
-    <div class="legend"><span><i class="sw" style="background:var(--now)"></i>Buying today</span><span><i class="sw" style="background:var(--add2)"></i>Added by the lift</span></div>
+    <div class="legend"><span><i class="sw" style="background:var(--now)"></i>Buying today</span><span><i class="sw" style="background:var(--add2)"></i>Added by the increase</span></div>
     <div class="what" id="what"></div>
     <p class="note" id="modeNote"></p>
   </section>
@@ -199,14 +194,13 @@ const SV = [
   { k: 'irr', name: 'Irrigation start-up and blowout', sub: 'Clay’s estimate, 100 to 150', count: 125, est: true },
   { k: 'gyp', name: 'Gypsum', sub: 'Count in question', count: 2, flag: true },
 ];
-const price = {}; let lift = 10, mode = 'points';
+const price = {}; let lift = 10;
 const base = () => Math.max(1, parseFloat($('#base').value) || 1300);
 
 function renderHead() {
   const b = base(), rates = SV.filter(s => !s.flag).map(s => s.count / b);
   const lo = Math.min(...rates), hi = Math.max(...rates);
   $('#headline').textContent = `Of ${fmt(b)} Top Choice customers, between ${Math.round(lo * 100)} and ${Math.round(hi * 100)} percent bought any one add-on this year. The other ${100 - Math.round(hi * 100)} to ${100 - Math.round(lo * 100)} percent bought it somewhere else, or not at all.`;
-  $('#perPoint').textContent = fmt(b / 100);
   const priced = SV.filter(s => price[s.k] > 0), rev = priced.reduce((a, s) => a + s.count * price[s.k], 0);
   const anyPrice = priced.length > 0;
   $('#kpis').innerHTML = [
@@ -225,26 +219,20 @@ function renderToday() {
   $('#today').innerHTML = `<thead><tr><th>Service</th><th class="r">Bought</th><th class="r">Take rate</th><th>Share of customers</th><th class="r">Did not buy</th><th class="r">Price per customer</th><th class="r">Revenue today</th></tr></thead><tbody>` +
     SV.map(s => { const p = price[s.k] || 0; return `<tr><td class="svc">${s.name}<small>${s.sub}</small></td><td class="r num">${s.est ? `<input type="number" id="c_${s.k}" value="${s.count}" min="0" step="1" aria-label="Irrigation customers">` : fmt(s.count)}</td><td class="r num">${(s.count / b * 100).toFixed(1)}%</td><td>${bar(s.count, 0, b)}</td><td class="r num">${fmt(Math.max(0, b - s.count))}</td><td class="r"><input class="price" type="number" min="0" step="1" data-k="${s.k}" value="${p || ''}" placeholder="$" aria-label="Price per customer for ${s.name}"></td><td class="r num">${p ? money(s.count * p) : '<span class="muted">needs price</span>'}</td></tr>`; }).join('') + `</tbody>`;
 }
-function added(s) {
-  const b = base();
-  if (mode === 'points') return Math.min(b - s.count, Math.round(b * lift / 100));
-  return Math.min(b - s.count, Math.round(s.count * lift / 100));
-}
+function added(s) { return Math.min(base() - s.count, Math.round(s.count * lift / 100)); }
 function renderWhatIf() {
   const b = base(); let totAdd = 0, totRev = 0, anyPrice = false;
   const rows = SV.map(s => { const a = added(s), p = price[s.k] || 0, nr = (s.count + a) / b * 100; totAdd += a; if (p) { anyPrice = true; totRev += a * p; }
     return `<tr><td class="svc">${s.name}</td><td class="r num">${fmt(s.count)}</td><td class="r num">+${fmt(a)}</td><td class="r num">${fmt(s.count + a)}</td><td class="r num">${nr.toFixed(1)}%</td><td>${bar(s.count, a, b)}</td><td class="r num">${p ? money(a * p) : '<span class="muted">needs price</span>'}</td></tr>`; }).join('');
   $('#whatif').innerHTML = `<thead><tr><th>Service</th><th class="r">Buying today</th><th class="r">More customers</th><th class="r">Would be buying</th><th class="r">New take rate</th><th>Share of customers</th><th class="r">Added revenue</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>All five</td><td></td><td class="r num">+${fmt(totAdd)}</td><td></td><td></td><td></td><td class="r num">${anyPrice ? money(totRev) : 'Add prices'}</td></tr></tfoot>`;
-  const label = mode === 'points' ? `+${lift} points of take rate` : `${lift} percent more buyers`;
+  const label = `${lift}% more buyers`;
   const todayRev = SV.reduce((a, s) => a + (price[s.k] ? s.count * price[s.k] : 0), 0);
   $('#what').innerHTML = [
-    ['Lift applied', `<span style="font-size:22px">${label}</span>`, 'Same lift on every service'],
+    ['Growth applied', label, 'Same percent on every service'],
     ['Customer yeses added', `+${fmt(totAdd)}`, 'Across the five services'],
     ['Added revenue', anyPrice ? money(totRev) : 'Add prices', anyPrice ? `Add-on dollars per customer go from ${money(todayRev / b)} to ${money((todayRev + totRev) / b)}` : 'Type prices above to see dollars'],
   ].map(k => `<div class="card"><div class="eyebrow">${k[0]}</div><div class="v num">${k[1]}</div><div class="s muted">${k[2]}</div></div>`).join('');
-  $('#modeNote').textContent = mode === 'points'
-    ? `Points of take rate: +${lift} points means ${fmt(b * lift / 100)} more customers buy each service, whatever its starting point. Aeration would go from ${Math.round(SV[0].count / b * 100)} to ${Math.round((SV[0].count + added(SV[0])) / b * 100)} percent.`
-    : `Percent more buyers: ${lift} percent more than today's count. Aeration would go from ${fmt(SV[0].count)} to ${fmt(SV[0].count + added(SV[0]))} customers. Small starting counts stay small this way, which is why points of take rate is the default.`;
+  $('#modeNote').textContent = `${lift}% more buyers on aeration takes it from ${fmt(SV[0].count)} to ${fmt(SV[0].count + added(SV[0]))} customers. A service can never grow past the ${fmt(b)} customer base.`;
 }
 function renderAll() { renderHead(); renderToday(); renderWhatIf(); }
 document.addEventListener('input', e => {
@@ -252,13 +240,12 @@ document.addEventListener('input', e => {
   if (t.id === 'base') { renderAll(); return; }
   if (t.id === 'irr' || t.id === 'c_irr') { const v = Math.max(0, parseInt(t.value) || 0); SV[3].count = v; $('#irr').value = v; const c = $('#c_irr'); if (c && c !== t) c.value = v; renderHead(); if (t.id === 'irr') renderToday(); renderWhatIf(); return; }
   if (t.dataset && t.dataset.k) { const v = parseFloat(t.value); price[t.dataset.k] = v > 0 ? v : 0; renderHead(); renderWhatIf(); const row = t.closest('tr'); if (row) row.lastElementChild.innerHTML = v > 0 ? money(SV.find(s => s.k === t.dataset.k).count * v) : '<span class="muted">needs price</span>'; return; }
-  if (t.id === 'custom') { const v = parseFloat(t.value); if (v >= 0) { lift = v; document.querySelectorAll('#lift button').forEach(b => b.setAttribute('aria-pressed', 'false')); renderWhatIf(); } }
+  if (t.id === 'custom') { const v = parseFloat(t.value); if (v >= 0) { lift = v; document.querySelectorAll('#lift button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === v))); renderWhatIf(); } }
 });
 document.addEventListener('click', e => {
-  const b = e.target.closest('#lift button, #mode button'); if (!b) return;
-  const group = b.parentElement; group.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-  if (group.id === 'lift') { lift = +b.dataset.v; $('#custom').value = ''; } else mode = b.dataset.v;
-  renderWhatIf();
+  const b = e.target.closest('#lift button'); if (!b) return;
+  b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  lift = +b.dataset.v; $('#custom').value = lift; renderWhatIf();
 });
 renderAll();
 </script>
